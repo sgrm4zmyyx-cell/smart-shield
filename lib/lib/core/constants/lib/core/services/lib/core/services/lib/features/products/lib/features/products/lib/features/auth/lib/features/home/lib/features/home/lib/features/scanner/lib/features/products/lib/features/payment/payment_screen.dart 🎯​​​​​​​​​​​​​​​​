@@ -1,0 +1,242 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:smart_shield/core/constants/app_colors.dart';
+
+const String _paymobApiKey = 'YOUR_PAYMOB_API_KEY';
+const int _paymobIntegrationId = 0;
+const int _paymobWalletIntegrationId = 0;
+const int _subscriptionAmountCents = 5000;
+
+class PaymentScreen extends StatefulWidget {
+  const PaymentScreen({super.key});
+
+  @override
+  State<PaymentScreen> createState() => _PaymentScreenState();
+}
+
+class _PaymentScreenState extends State<PaymentScreen> {
+  bool _isLoading = false;
+  String _selectedMethod = 'card';
+
+  Future<String?> _getAuthToken() async {
+    final response = await http.post(
+      Uri.parse('https://accept.paymob.com/api/auth/tokens'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'api_key': _paymobApiKey}),
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body)['token'];
+    }
+    return null;
+  }
+
+  Future<int?> _createOrder(String authToken) async {
+    final response = await http.post(
+      Uri.parse('https://accept.paymob.com/api/ecommerce/orders'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'auth_token': authToken,
+        'delivery_needed': false,
+        'amount_cents': _subscriptionAmountCents,
+        'currency': 'EGP',
+        'items': [
+          {
+            'name': 'Smart Shield - اشتراك شهري',
+            'amount_cents': _subscriptionAmountCents,
+            'quantity': 1,
+          }
+        ],
+      }),
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body)['id'];
+    }
+    return null;
+  }
+
+  Future<void> _initiatePayment() async {
+    setState(() => _isLoading = true);
+    try {
+      final authToken = await _getAuthToken();
+      if (authToken == null) throw Exception('فشل الاتصال بـ Paymob');
+      final orderId = await _createOrder(authToken);
+      if (orderId == null) throw Exception('فشل إنشاء الطلب');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('جاري الاتصال ببوابة الدفع...',
+            style: TextStyle(fontFamily: 'Cairo')),
+        backgroundColor: AppColors.success,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('خطأ: ${e.toString()}',
+            style: const TextStyle(fontFamily: 'Cairo')),
+        backgroundColor: AppColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          title: const Text('الاشتراك',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold)),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryLight],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  children: [
+                    Text('🛡️ Smart Shield Pro',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Cairo',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    Text('50 جنيه / شهرياً',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Cairo',
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold)),
+                    SizedBox(height: 16),
+                    _FeatureRow('✓ جميع الميزات الـ 20 مفعّلة'),
+                    _FeatureRow('✓ إشعارات ذكية للانتهاء'),
+                    _FeatureRow('✓ ماسح باركود غير محدود'),
+                    _FeatureRow('✓ دعم فني مباشر'),
+                    _FeatureRow('✓ تحديثات مجانية'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text('اختر طريقة الدفع:',
+                    style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16)),
+              ),
+              const SizedBox(height: 12),
+              _buildPaymentOption('card', 'بطاقة بنكية / ميزة',
+                  Icons.credit_card, 'Visa - Mastercard - Meeza'),
+              const SizedBox(height: 10),
+              _buildPaymentOption('wallet', 'محفظة إلكترونية',
+                  Icons.account_balance_wallet, 'Vodafone Cash - Orange Cash'),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _initiatePayment,
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16))),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('ادفع الآن - 50 جنيه',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'Cairo')),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('🔒 الدفع آمن ومشفّر عبر Paymob',
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Cairo',
+                      fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentOption(
+      String value, String title, IconData icon, String subtitle) {
+    final isSelected = _selectedMethod == value;
+    return InkWell(
+      onTap: () => setState(() => _selectedMethod = value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 2 : 1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(children: [
+          Icon(icon,
+              color:
+                  isSelected ? AppColors.primary : AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.bold,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textPrimary)),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 11,
+                      color: AppColors.textSecondary)),
+            ]),
+          ),
+          if (isSelected)
+            const Icon(Icons.check_circle, color: AppColors.primary),
+        ]),
+      ),
+    );
+  }
+}
+
+class _FeatureRow extends StatelessWidget {
+  final String text;
+  const _FeatureRow(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Text(text,
+          style: const TextStyle(
+              color: Colors.white70, fontFamily: 'Cairo', fontSize: 14)),
+    );
+  }
+}
