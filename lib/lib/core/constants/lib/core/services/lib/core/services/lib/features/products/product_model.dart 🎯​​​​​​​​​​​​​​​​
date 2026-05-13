@@ -1,0 +1,56 @@
+import 'package:hive/hive.dart';
+
+part 'product_model.g.dart';
+
+@HiveType(typeId: 0)
+class ProductModel extends HiveObject {
+  @HiveField(0)
+  final String id;
+
+  @HiveField(1)
+  final String name;
+
+  @HiveField(2)
+  final String barcode;
+
+  @HiveField(3)
+  final DateTime expiryDate;
+
+  @HiveField(4)
+  final String alertType;
+
+  @HiveField(5)
+  final String branchId;
+
+  ProductModel({
+    required this.id,
+    required this.name,
+    required this.barcode,
+    required this.expiryDate,
+    required this.alertType,
+    required this.branchId,
+  });
+
+  int get daysRemaining => expiryDate.difference(DateTime.now()).inDays;
+  bool get isExpired => daysRemaining < 0;
+  bool get isExpiringSoon => daysRemaining <= 7;
+  bool get isExpiringThisMonth => daysRemaining <= 30;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'barcode': barcode,
+        'expiryDate': expiryDate.toIso8601String(),
+        'alertType': alertType,
+        'branchId': branchId,
+      };
+
+  factory ProductModel.fromMap(Map<String, dynamic> map) => ProductModel(
+        id: map['id'],
+        name: map['name'],
+        barcode: map['barcode'],
+        expiryDate: DateTime.parse(map['expiryDate']),
+        alertType: map['alertType'],
+        branchId: map['branchId'],
+      );
+}
