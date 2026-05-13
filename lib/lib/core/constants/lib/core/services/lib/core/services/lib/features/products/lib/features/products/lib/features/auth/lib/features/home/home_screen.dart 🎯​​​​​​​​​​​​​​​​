@@ -1,0 +1,240 @@
+import 'package:flutter/material.dart';
+import 'package:smart_shield/core/constants/app_colors.dart';
+import 'package:smart_shield/core/constants/app_strings.dart';
+import 'package:smart_shield/features/auth/subscription_guard.dart';
+import 'package:smart_shield/features/home/feature_card.dart';
+import 'package:smart_shield/features/products/add_product_screen.dart';
+import 'package:smart_shield/features/scanner/scanner_screen.dart';
+import 'package:smart_shield/features/payment/payment_screen.dart';
+
+class HomeScreen extends StatefulWidget {
+  final SubscriptionGuard subscriptionGuard;
+  const HomeScreen({super.key, required this.subscriptionGuard});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final int _unlockedCount = 8;
+  final int _totalCount = 20;
+
+  void _onFeatureTap(int index) {
+    if (index >= _unlockedCount) {
+      _showLockedSnackBar();
+      return;
+    }
+    switch (index) {
+      case 0:
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AddProductScreen()));
+        break;
+      case 1:
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const ScannerScreen()));
+        break;
+      case 7:
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const PaymentScreen()));
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('جاري تطوير هذه الميزة...',
+                style: TextStyle(fontFamily: 'Cairo')),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+    }
+  }
+
+  void _showLockedSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(AppStrings.lockedFeature,
+            textAlign: TextAlign.right,
+            style: TextStyle(fontFamily: 'Cairo', fontSize: 14)),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        action: SnackBarAction(
+          label: 'اشترك الآن',
+          textColor: Colors.amber,
+          onPressed: () {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PaymentScreen()));
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.subscriptionGuard.checkStatus();
+    final isActive = status == SubscriptionStatus.active;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          title: const Text('Smart Shield 🛡️',
+              style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 20)),
+          centerTitle: true,
+          actions: [
+            if (!isActive)
+              Container(
+                margin: const EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                child: ElevatedButton(
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const PaymentScreen())),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber,
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: const Text('اشترك الآن',
+                      style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12)),
+                ),
+              ),
+          ],
+        ),
+        body: Column(
+          children: [
+            _buildBanner(status),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: GridView.builder(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: _totalCount,
+                  itemBuilder: (context, index) {
+                    final feature = AppStrings.features[index];
+                    return FeatureCard(
+                      icon: feature['icon'] as String,
+                      label: feature['label'] as String,
+                      isLocked: index >= _unlockedCount,
+                      onTap: () => _onFeatureTap(index),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('8 ميزة مفعّلة',
+                      style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Cairo',
+                          fontSize: 12)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('12 ميزة مقفولة 🔒',
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontFamily: 'Cairo',
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBanner(SubscriptionStatus status) {
+    if (status == SubscriptionStatus.active) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        color: AppColors.success.withOpacity(0.1),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.verified, color: AppColors.success, size: 16),
+            SizedBox(width: 8),
+            Text('اشتراك فعّال ✓',
+                style: TextStyle(
+                    color: AppColors.success,
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+    if (status == SubscriptionStatus.trial) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        color: Colors.amber.withOpacity(0.15),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.timer, color: Colors.amber, size: 16),
+            SizedBox(width: 8),
+            Text('فترة تجريبية مجانية - 7 أيام',
+                style: TextStyle(
+                    color: Colors.amber,
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      color: AppColors.danger.withOpacity(0.1),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.warning, color: AppColors.danger, size: 16),
+          SizedBox(width: 8),
+          Text('اشتراكك منتهي - جدد الآن',
+              style: TextStyle(
+                  color: AppColors.danger,
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
