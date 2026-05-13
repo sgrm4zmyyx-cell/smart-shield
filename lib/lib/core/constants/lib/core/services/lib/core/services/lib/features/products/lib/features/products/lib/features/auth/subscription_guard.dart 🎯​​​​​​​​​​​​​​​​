@@ -1,0 +1,129 @@
+import 'package:flutter/material.dart';
+import 'package:smart_shield/core/constants/app_colors.dart';
+import 'package:smart_shield/core/constants/app_strings.dart';
+import 'package:smart_shield/core/services/local_storage_service.dart';
+
+enum SubscriptionStatus {
+  active,
+  trial,
+  expired,
+  subscriptionExpired,
+}
+
+class SubscriptionGuard {
+  final LocalStorageService _local;
+
+  SubscriptionGuard(this._local);
+
+  SubscriptionStatus checkStatus() {
+    final isVip = _local.getIsVip();
+    final registrationDate = _local.getRegistrationDate();
+    final subscriptionExpiry = _local.getSubscriptionExpiry();
+
+    if (isVip && subscriptionExpiry != null) {
+      if (DateTime.now().isBefore(subscriptionExpiry)) {
+        return SubscriptionStatus.active;
+      } else {
+        return SubscriptionStatus.subscriptionExpired;
+      }
+    }
+
+    if (registrationDate != null) {
+      final daysSinceRegistration =
+          DateTime.now().difference(registrationDate).inDays;
+      if (daysSinceRegistration <= 7) {
+        return SubscriptionStatus.trial;
+      } else {
+        return SubscriptionStatus.expired;
+      }
+    }
+
+    _local.saveUserData({'registrationDate': DateTime.now().toIso8601String()});
+    return SubscriptionStatus.trial;
+  }
+
+  bool get canAccessPremiumFeatures {
+    return checkStatus() == SubscriptionStatus.active;
+  }
+}
+
+class TrialExpiredScreen extends StatelessWidget {
+  const TrialExpiredScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lock_outline,
+                    size: 60,
+                    color: AppColors.danger,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                const Text(
+                  AppStrings.trialExpired,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  AppStrings.trialExpiredMessage,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Cairo',
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      AppStrings.renewSubscription,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
